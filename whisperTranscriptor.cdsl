@@ -1,0 +1,11 @@
+import "WhisperStream.idsl";
+
+Component whisperTranscriptor
+{
+    Communications
+    {
+        publishes WhisperStream;
+    };
+    language python;
+};
+
