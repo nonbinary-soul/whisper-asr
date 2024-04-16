@@ -47,7 +47,7 @@ import os
 #################################### PORCUPINE #####################################
 
 ACCESS_KEY = "YhpQKilovfhz5/6XxLxq+Wmiz45bbtBUVruBptzYOdHqfyHhaUTpLw=="
-PPN_PATH = "./audio-config/hello-shadow_en_linux_v3_0_0/hello-shadow_en_linux_v3_0_0.ppn"
+PPN_PATH = "./src/audio-config/hello-shadow_en_linux_v3_0_0/hello-shadow_en_linux_v3_0_0.ppn"
 
 ############################### AUDIO DEVICE CONFIG ################################
 
@@ -116,6 +116,8 @@ class SpecificWorker(GenericWorker):
     ############################
     def __init__(self, proxy_map, startup_check=False):
         super(SpecificWorker, self).__init__(proxy_map)
+
+        # initial params definition
         self.Period = 1000
         self.novoice_counter = 0
         self.silence_detected = Event()
@@ -147,22 +149,22 @@ class SpecificWorker(GenericWorker):
     # transcription management
     ############################
     def generate_wav(self, file_name, record): 
-    """
-    Generate a WAV file with the specified file_name using the provided audio record.
+        """
+        Generate a WAV file with the specified file_name using the provided audio record.
 
-    Parameters:
-        file_name (str): The name of the WAV file to be generated.
-        record (bytes): The audio record data to be written to the WAV file.
+        Parameters:
+            file_name (str): The name of the WAV file to be generated.
+            record (bytes): The audio record data to be written to the WAV file.
 
-    Returns:
-        None
+        Returns:
+            None
 
-    Raises:
-        IOError: If there is an error writing the WAV file.
+        Raises:
+            IOError: If there is an error writing the WAV file.
 
-    Example:
-        generate_wav("output.wav", record_data)
-    """
+        Example:
+            generate_wav("output.wav", record_data)
+        """
         with wave.open(file_name, 'wb') as wf:
             wf.setnchannels(RESPEAKER_CHANNELS)
             wf.setsampwidth(audio.get_sample_size(FORMAT))
@@ -170,66 +172,66 @@ class SpecificWorker(GenericWorker):
             wf.writeframes(b''.join(record))
 
     def call_whisper(self, audio_file): 
-    """
-    Call the Whisper speech recognition system to transcribe the audio file.
+        """
+        Call the Whisper speech recognition system to transcribe the audio file.
 
-    Parameters:
-        audio_file (str): The path to the audio file to be transcribed.
+        Parameters:
+            audio_file (str): The path to the audio file to be transcribed.
 
-    Returns:
-        None
+        Returns:
+            None
 
-    Raises:
-        subprocess.CalledProcessError: If the whisper command fails or returns a non-zero exit status.
+        Raises:
+            subprocess.CalledProcessError: If the whisper command fails or returns a non-zero exit status.
 
-    Example:
-        call_whisper("audio.wav")
-    """
+        Example:
+            call_whisper("audio.wav")
+        """
         command = ["whisper", audio_file, "--model", "tiny", "--language", "Spanish"]
         subprocess.run(command, check=True)
 
     def transcript(self, frame): 
-    """
-    Transcribe the given audio frame using the Whisper speech recognition system.
+        """
+        Transcribe the given audio frame using the Whisper speech recognition system.
 
-    This function generates a WAV file from the provided audio frame, transcribes it using
-    the Whisper speech recognition system, and appends the transcribed text to a file named
-    'prompt-llama.txt'.
+        This function generates a WAV file from the provided audio frame, transcribes it using
+        the Whisper speech recognition system, and appends the transcribed text to a file named
+        'prompt.txt'.
 
-    Parameters:
-        frame (bytes): The audio frame to be transcribed.
+        Parameters:
+            frame (bytes): The audio frame to be transcribed.
 
-    Returns:
-        None
+        Returns:
+            None
 
-    Example:
-        transcript(frame_data)
-    """
+        Example:
+            transcript(frame_data)
+        """
         self.generate_wav(OUTPUT_FILENAME, frame)
         self.call_whisper(OUTPUT_FILENAME)
-        subprocess.run(["cat", "record.txt"], stdout=open("prompt-llama.txt", "a"))
+        subprocess.run(["cat", "record.txt"], stdout=open("prompt.txt", "a"))
 
     def manage_transcription(self):
-    """
-    Manage transcription of audio frames until a silence is detected.
+        """
+        Manage transcription of audio frames until a silence is detected.
 
-    This function continuously processes audio frames from the self.record_queue until
-    a silence is detected. It calls the transcript function on each frame.
+        This function continuously processes audio frames from the self.record_queue until
+        a silence is detected. It calls the transcript function on each frame.
 
-    If the self.record_queue is not empty, it retrieves a frame and calls the transcript function.
-    This loop continues until a silence is detected (self.silence_detected.is_set()).
+        If the self.record_queue is not empty, it retrieves a frame and calls the transcript function.
+        This loop continues until a silence is detected (self.silence_detected.is_set()).
 
-    Before finishing, it ensures that all remaining frames in the self.record_queue are processed.
+        Before finishing, it ensures that all remaining frames in the self.record_queue are processed.
 
-    Parameters:
-        None
+        Parameters:
+            None
 
-    Returns:
-        None
+        Returns:
+            None
 
-    Example:
-        manage_transcription()
-    """
+        Example:
+            manage_transcription()
+        """
         while not self.silence_detected.is_set():
             if not self.record_queue.empty():
                 frame = self.record_queue.get()
@@ -240,106 +242,123 @@ class SpecificWorker(GenericWorker):
             frame = self.record_queue.get()
             self.transcript(frame)
 
-    def terminate(self):
-    """
-    Stop the audio stream and release resources.
-
-    This function stops the audio stream, closes it, and terminates the PyAudio object.
-    Additionally, it deletes the Porcupine object, releasing its resources.
-
-    Parameters:
-        None
-
-    Returns:
-        None
-
-    Example:
-        terminate()
-    """
-    stream.stop_stream()
-    stream.close()
-    audio.terminate()
-    self.porcupine.delete()
-
-
-    def delete_llama_prompt(self):
-    """
-    Delete the 'prompt-llama.txt' file if it exists.
-
-    This function checks if the 'prompt-llama.txt' file exists in the current directory.
-    If it exists, it deletes the file using the 'rm' command.
-
-    Parameters:
-        None
-
-    Returns:
-        None
-
-    Example:
-        delete_llama_prompt()
-    """
-    if os.path.exists("prompt-llama.txt"):
-        subprocess.run(["rm", "prompt-llama.txt"])
-
     def send_transcription(self):
-        
+        """
+        Send the transcription message using the content of the 'prompt.txt' file.
+
+        This function reads the content of the 'prompt.txt' file and sends it as a transcription message
+        using the whisperstream proxy.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+
+        Example:
+            send_transcription()
+        """
+        with open('prompt.txt', 'r') as file:
+            message = file.read().strip()
+            
         self.whisperstream_proxy.OnMessageTranscribed(message)
 
+    def terminate(self):
+        """
+        Stop the audio stream and release resources.
 
-    #### COMPUTE
+        This function stops the audio stream, closes it, and terminates the PyAudio object.
+        Additionally, it deletes the Porcupine object, releasing its resources.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+
+        Example:
+            terminate()
+        """
+        stream.stop_stream()
+        stream.close()
+        audio.terminate()
+        self.porcupine.delete()
+
+    def delete_llama_prompt(self):
+        """
+        Delete the 'prompt.txt' file if it exists.
+
+        This function checks if the 'prompt.txt' file exists in the current directory.
+        If it exists, it deletes the file using the 'rm' command.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+
+        Example:
+            delete_llama_prompt()
+        """
+        if os.path.exists("prompt.txt"):
+            subprocess.run(["rm", "prompt.txt"])
+
+
+    ############################
+    # Compute
+    ############################
     @QtCore.Slot()
     def compute(self):
         print('SpecificWorker.compute...')
 
-        transcription_process = Process(target=manage_transcription)
-        transcription_process.start()
-
-        # detector de voz
-        mic_tunning = Tuning(usb.core.find(idVendor=0x2886, idProduct=0x0018))
-        record = []  # grabación tras la wake word
-
-        # limpiar el directorio antes de comenzar
+        # clean the directory
         self.delete_llama_prompt()
+
+        # start multiprocessing management
+        transcription_process = Process(target=manage_transcription)
+        transcription_process.start()        
+
+        # initialize detector of Reaspeaker
+        mic_tunning = Tuning(usb.core.find(idVendor=0x2886, idProduct=0x0018))
+        record = []  # save the recording after the wake word has been detected
 
         try:
             self.silence_detected.clear()
             while not self.silence_detected.is_set():
-                # verificar si es la wake word
+                # take an audio fragment
                 pcm = stream.read(self.porcupine.frame_length, exception_on_overflow=False)
                 pcm = np.frombuffer(pcm, dtype=np.int16)
                 
-                # Procesar el audio para detectar la wake word
+                # process fragment to detect the wake word
                 keyword_index = self.porcupine.process(pcm)
 
-                # Si se detecta la palabra clave, iniciar la grabación 
+                # if the wake word has been detected, start recording
                 if keyword_index >= 0:
                     print("Listening...")
-                    # limpiar el directorio antes de comenzar
-                    self.delete_llama_prompt()
-                    # Vaciamos el contenido de la grabación hasta ahora
+                    # delete recoring till now
                     record.clear()
-                    # Iniciamos grabación
+                    # start recording
                     self.is_recording = True
 
                 if self.is_recording:
-                    record.append(pcm.copy())
+                    record.append(pcm.copy()) # add audio fragment
 
-                if mic_tunning.is_voice(): # si se detecta voz
-                    self.novoice_counter = 0  # reiniciamos la captación de silencio
+                if mic_tunning.is_voice(): # if voice detected
+                    self.novoice_counter = 0  # restart no voice detection
                     self.pause_detected = False
-                else:  # sino
+                else: 
                     if self.is_recording: 
                         self.novoice_counter += 1
                         
-                        # Verificar si se ha alcanzado la pausa especificada
+                        # check if a pause duration has been reached
                         if self.novoice_counter >= PAUSE_DURATION*64 and not self.pause_detected:
                             print("Pause")
                             self.pause_detected = True
-                            # encolar el fragmento de audio para su transcripción
+                            # enqueue the fragment for transcription 
                             self.record_queue.put(record.copy())
                             record.clear()
 
-                        # Verificar si se ha alcanzado la duración de silencio requerida
+                        # check if a silence duration has been reached to finish the program
                         if self.novoice_counter >= SILENCE_DURATION*64:
                             print("Silence")
                             self.silence_detected.set()
