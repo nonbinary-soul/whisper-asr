@@ -187,7 +187,7 @@ class SpecificWorker(GenericWorker):
         Example:
             call_whisper("audio.wav")
         """
-        command = ["whisper", audio_file, "--model", "tiny", "--language", "Spanish"]
+        command = ["whisper", audio_file, "--model", "small", "--language", "Spanish"]
         subprocess.run(command, check=True)
 
     def transcript(self, frame): 
@@ -209,7 +209,8 @@ class SpecificWorker(GenericWorker):
         """
         self.generate_wav(OUTPUT_FILENAME, frame)
         self.call_whisper(OUTPUT_FILENAME)
-        subprocess.run(["cat", "record.txt"], stdout=open("prompt.txt", "a"))
+        with open("prompt.txt", "a") as prompt_file:
+            subprocess.run(["cat", "record.txt"], stdout=prompt_file)
 
     def manage_transcription(self):
         """
@@ -314,8 +315,17 @@ class SpecificWorker(GenericWorker):
         # clean the directory
         self.delete_llama_prompt()
 
+        # initialize params
+        self.novoice_counter = 0
+        self.silence_detected = Event()
+        self.pause_detected = False
+        self.is_recording = False
+        self.record_queue = Queue()
+        global ACCESS_KEY, PPN_PATH  
+        self.porcupine = pvporcupine.create(access_key=ACCESS_KEY, keyword_paths=[PPN_PATH])
+
         # start multiprocessing management
-        transcription_process = Process(target=manage_transcription)
+        transcription_process = Process(target=self.manage_transcription)
         transcription_process.start()        
 
         # initialize detector of Reaspeaker
@@ -364,7 +374,6 @@ class SpecificWorker(GenericWorker):
                             self.silence_detected.set()
                             self.send_transcription()
                             transcription_process.join()
-                            self.terminate()
 
         except KeyboardInterrupt:
             transcription_process.join()
