@@ -46,7 +46,10 @@ import os
 
 #################################### PORCUPINE #####################################
 
-ACCESS_KEY = "YhpQKilovfhz5/6XxLxq+Wmiz45bbtBUVruBptzYOdHqfyHhaUTpLw=="
+ACCESS_KEY = os.getenv("PORCUPINE_ACCESS_KEY")
+if ACCESS_KEY is None:
+    raise ValueError("The PORCUPINE_ACCESS_KEY environment variable is not set.")
+    
 PPN_PATH = "./src/audio-config/hello-shadow_en_linux_v3_0_0/hello-shadow_en_linux_v3_0_0.ppn"
 
 ############################### AUDIO DEVICE CONFIG ################################
